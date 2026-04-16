@@ -26,7 +26,7 @@ class _WeatherUpdatesAdminPageState extends State<WeatherUpdatesAdminPage> {
     try {
       final data = await _apiService.fetchUpdates();
       setState(() {
-        _updates = data;
+        _updates = data.reversed.toList();
       });
     } catch (e) {
       if (mounted) {
