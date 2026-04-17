@@ -13,11 +13,7 @@ class AdminLandingPage extends StatefulWidget {
 class _AdminLandingPageState extends State<AdminLandingPage> {
   int _currentIndex = 0;
 
-  final List<String> _tabTitles = [
-    'Admin Dashboard',
-    'Manage News',
-    'Manage Users',
-  ];
+
 
   final List<Widget> _pages = const [
     AdminDashboard(),

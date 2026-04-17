@@ -64,10 +64,19 @@ class _SignInPageState extends State<SignInPage> {
             Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
           } else {
             final displayName = responseData['displayName'] as String? ?? '';
+            final localId = responseData['localId'] as String? ?? '';
+            final photoUrl = responseData['photoUrl'] as String? ?? '';
+            final notificationSetting = responseData['notification'] as String? ?? '';
+            final themeSetting = responseData['theme'] as String? ?? '';
+
             // Update auth state
             AuthState().signIn(
               emailInput,
               displayName: displayName,
+              uid: localId,
+              photoUrl: photoUrl,
+              notification: notificationSetting,
+              theme: themeSetting,
             );
 
             if (Navigator.canPop(context)) {

@@ -17,6 +17,9 @@ class _PlannerPageState extends State<PlannerPage> {
   List<PlannerBoard> _boards = [];
   bool _loadingBoards = true;
 
+  // Per-board pending task counts (non-done)
+  Map<String, int> _pendingCountMap = {};
+
   // Board detail state
   PlannerBoard? _selectedBoard;
   List<PlannerTask> _tasks = [];
@@ -40,8 +43,24 @@ class _PlannerPageState extends State<PlannerPage> {
     try {
       final boards = await _repository.getBoards(_userId);
       if (mounted) setState(() { _boards = boards; _loadingBoards = false; });
+      _fetchPendingCounts();
     } catch (_) {
       if (mounted) setState(() { _error = 'Failed to load plans.'; _loadingBoards = false; });
+    }
+  }
+
+  Future<void> _fetchPendingCounts() async {
+    try {
+      final allTasks = await _repository.getTasks(_userId);
+      final Map<String, int> counts = {};
+      for (final task in allTasks) {
+        if (task.status != 'done' && task.boardId != null) {
+          counts[task.boardId!] = (counts[task.boardId!] ?? 0) + 1;
+        }
+      }
+      if (mounted) setState(() => _pendingCountMap = counts);
+    } catch (_) {
+      // silent fail
     }
   }
 
@@ -177,6 +196,7 @@ class _PlannerPageState extends State<PlannerPage> {
     });
     try {
       await _repository.updateTask(task.copyWith(status: newStatus), _userId);
+      _fetchPendingCounts();
     } catch (_) {
       if (mounted) { _fetchTasks(); _snack('Failed to update status'); }
     }
@@ -252,7 +272,7 @@ class _PlannerPageState extends State<PlannerPage> {
                 const Align(alignment: Alignment.centerLeft, child: Text('Weather Condition:', style: TextStyle(fontWeight: FontWeight.w600, fontSize: 13))),
                 const SizedBox(height: 8),
                 DropdownButtonFormField<String>(
-                  value: conditions.contains(condition) ? condition : 'Any',
+                  initialValue: conditions.contains(condition) ? condition : 'Any',
                   decoration: InputDecoration(border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)), isDense: true),
                   items: conditions.map((c) => DropdownMenuItem(value: c, child: Text(c))).toList(),
                   onChanged: (val) { if (val != null) setDialogState(() => condition = val); },
@@ -308,7 +328,7 @@ class _PlannerPageState extends State<PlannerPage> {
                 final weatherTarget = condition == 'Any' ? null : condition;
 
                 if (isEdit) {
-                  final updated = existingTask!.copyWith(
+                  final updated = existingTask.copyWith(
                     title: titleCtrl.text.trim(), description: descCtrl.text.trim(),
                     weatherConditionTarget: weatherTarget, dueDate: dueDateStr, clearDueDate: dueDate == null,
                   );
@@ -372,26 +392,32 @@ class _PlannerPageState extends State<PlannerPage> {
   @override
   Widget build(BuildContext context) {
     final isDetail = _selectedBoard != null;
-    return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FA),
-      appBar: AppBar(
-        backgroundColor: Colors.white,
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios, color: Colors.black87, size: 20),
-          onPressed: isDetail ? _goBackToBoards : () => Navigator.pop(context),
-        ),
-        title: Text(
-          isDetail ? _selectedBoard!.name : 'Atmos Planner',
-          style: const TextStyle(color: Colors.black87, fontWeight: FontWeight.bold),
-        ),
-      ),
-      body: isDetail ? _buildBoardDetail() : _buildBoardList(),
-      floatingActionButton: FloatingActionButton(
-        onPressed: isDetail ? () => _showTaskFormDialog(null) : _showCreateBoardDialog,
-        backgroundColor: const Color(0xFF29B6F6),
-        child: const Icon(Icons.add, color: Colors.white),
-      ),
+    return ListenableBuilder(
+      listenable: AuthState(),
+      builder: (context, _) {
+        final isDark = AuthState().theme == 'Dark Mode';
+        return Scaffold(
+          backgroundColor: isDark ? const Color(0xFF121212) : const Color(0xFFF5F7FA),
+          appBar: AppBar(
+            backgroundColor: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_ios, color: isDark ? Colors.white70 : Colors.black87, size: 20),
+              onPressed: isDetail ? _goBackToBoards : () => Navigator.pop(context),
+            ),
+            title: Text(
+              isDetail ? _selectedBoard!.name : 'Atmos Planner',
+              style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontWeight: FontWeight.bold),
+            ),
+          ),
+          body: isDetail ? _buildBoardDetail(isDark) : _buildBoardList(isDark),
+          floatingActionButton: FloatingActionButton(
+            onPressed: isDetail ? () => _showTaskFormDialog(null) : _showCreateBoardDialog,
+            backgroundColor: const Color(0xFF29B6F6),
+            child: const Icon(Icons.add, color: Colors.white),
+          ),
+        );
+      },
     );
   }
 
@@ -399,7 +425,7 @@ class _PlannerPageState extends State<PlannerPage> {
   // BOARD LIST VIEW (first view)
   // ════════════════════════════════════════════
 
-  Widget _buildBoardList() {
+  Widget _buildBoardList(bool isDark) {
     if (_loadingBoards) return const Center(child: CircularProgressIndicator(color: Color(0xFF29B6F6)));
     if (_error != null) {
       return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -436,16 +462,16 @@ class _PlannerPageState extends State<PlannerPage> {
             child: Container(
               padding: const EdgeInsets.all(18),
               decoration: BoxDecoration(
-                color: Colors.white,
+                color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
                 borderRadius: BorderRadius.circular(16),
-                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 10, offset: const Offset(0, 4))],
+                boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 10, offset: const Offset(0, 4))],
               ),
               child: Row(
                 children: [
                   Container(
                     width: 44, height: 44,
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE3F2FD),
+                      color: isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD),
                       borderRadius: BorderRadius.circular(12),
                     ),
                     child: const Icon(Icons.dashboard_outlined, color: Color(0xFF1E88E5), size: 22),
@@ -455,10 +481,10 @@ class _PlannerPageState extends State<PlannerPage> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Text(board.name, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: Colors.black87)),
+                        Text(board.name, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16, color: isDark ? Colors.white : Colors.black87)),
                         if (board.description.isNotEmpty) ...[
                           const SizedBox(height: 2),
-                          Text(board.description, style: const TextStyle(fontSize: 13, color: Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
+                          Text(board.description, style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black54), maxLines: 1, overflow: TextOverflow.ellipsis),
                         ],
                         const SizedBox(height: 4),
                         Text('${board.taskCount} task${board.taskCount == 1 ? '' : 's'}',
@@ -466,12 +492,17 @@ class _PlannerPageState extends State<PlannerPage> {
                       ],
                     ),
                   ),
+                  if ((_pendingCountMap[board.id] ?? 0) > 0)
+                    Container(
+                      margin: const EdgeInsets.only(right: 4),
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      decoration: BoxDecoration(color: Colors.red, borderRadius: BorderRadius.circular(12)),
+                      child: Text('${_pendingCountMap[board.id]}', style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold)),
+                    ),
                   PopupMenuButton<String>(
-                    icon: const Icon(Icons.more_vert, size: 20, color: Colors.grey),
+                    icon: Icon(Icons.more_vert, size: 20, color: isDark ? Colors.white54 : Colors.grey),
                     shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-                    onSelected: (val) {
-                      if (val == 'delete') _confirmDeleteBoard(board);
-                    },
+                    onSelected: (val) { if (val == 'delete') _confirmDeleteBoard(board); },
                     itemBuilder: (_) => [
                       PopupMenuItem(value: 'delete', child: Row(children: [
                         Icon(Icons.delete_outline, size: 18, color: Colors.red.shade400), const SizedBox(width: 8),
@@ -479,7 +510,7 @@ class _PlannerPageState extends State<PlannerPage> {
                       ])),
                     ],
                   ),
-                  const Icon(Icons.chevron_right, color: Colors.grey, size: 22),
+                  Icon(Icons.chevron_right, color: isDark ? Colors.white38 : Colors.grey, size: 22),
                 ],
               ),
             ),
@@ -493,7 +524,7 @@ class _PlannerPageState extends State<PlannerPage> {
   // BOARD DETAIL VIEW (tasks inside a plan)
   // ════════════════════════════════════════════
 
-  Widget _buildBoardDetail() {
+  Widget _buildBoardDetail(bool isDark) {
     if (_loadingTasks) return const Center(child: CircularProgressIndicator(color: Color(0xFF29B6F6)));
     if (_error != null) {
       return Center(child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
@@ -523,18 +554,18 @@ class _PlannerPageState extends State<PlannerPage> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildSection('To Do', 'todo', const Color(0xFFE3F2FD), const Color(0xFF1E88E5)),
+          _buildSection('To Do', 'todo', isDark ? const Color(0xFF1A2744) : const Color(0xFFE3F2FD), const Color(0xFF1E88E5), isDark),
           const SizedBox(height: 20),
-          _buildSection('In Progress', 'in_progress', const Color(0xFFFFF3E0), const Color(0xFFFB8C00)),
+          _buildSection('In Progress', 'in_progress', isDark ? const Color(0xFF2A1A00) : const Color(0xFFFFF3E0), const Color(0xFFFB8C00), isDark),
           const SizedBox(height: 20),
-          _buildSection('Done', 'done', const Color(0xFFE8F5E9), const Color(0xFF43A047)),
+          _buildSection('Done', 'done', isDark ? const Color(0xFF0A2010) : const Color(0xFFE8F5E9), const Color(0xFF43A047), isDark),
           const SizedBox(height: 80),
         ],
       ),
     );
   }
 
-  Widget _buildSection(String title, String status, Color bgColor, Color accentColor) {
+  Widget _buildSection(String title, String status, Color bgColor, Color accentColor, bool isDark) {
     final sectionTasks = _tasks.where((t) => t.status == status).toList();
 
     return DragTarget<PlannerTask>(
@@ -545,9 +576,9 @@ class _PlannerPageState extends State<PlannerPage> {
           duration: const Duration(milliseconds: 200),
           width: double.infinity,
           decoration: BoxDecoration(
-            color: isHovering ? bgColor.withValues(alpha: 0.6) : const Color(0xFFF0F2F5),
+            color: isHovering ? bgColor.withValues(alpha: 0.6) : (isDark ? const Color(0xFF1A1A1A) : const Color(0xFFF0F2F5)),
             borderRadius: BorderRadius.circular(16),
-            border: Border.all(color: isHovering ? accentColor.withValues(alpha: 0.5) : Colors.grey.shade200, width: isHovering ? 2 : 1),
+            border: Border.all(color: isHovering ? accentColor.withValues(alpha: 0.5) : (isDark ? Colors.grey.shade800 : Colors.grey.shade200), width: isHovering ? 2 : 1),
           ),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -590,10 +621,10 @@ class _PlannerPageState extends State<PlannerPage> {
                         data: task,
                         feedback: Material(color: Colors.transparent, child: SizedBox(
                           width: MediaQuery.of(context).size.width - 64,
-                          child: Opacity(opacity: 0.85, child: _buildTaskCard(task)),
+                          child: Opacity(opacity: 0.85, child: _buildTaskCard(task, isDark)),
                         )),
-                        childWhenDragging: Opacity(opacity: 0.25, child: _buildTaskCard(task)),
-                        child: _buildTaskCard(task),
+                        childWhenDragging: Opacity(opacity: 0.25, child: _buildTaskCard(task, isDark)),
+                        child: _buildTaskCard(task, isDark),
                       ),
                     );
                   },
@@ -605,15 +636,16 @@ class _PlannerPageState extends State<PlannerPage> {
     );
   }
 
-  Widget _buildTaskCard(PlannerTask task) {
+  Widget _buildTaskCard(PlannerTask task, bool isDark) {
     final isOverdue = task.isOverdue;
     return GestureDetector(
       onTap: () => _showTaskFormDialog(task),
       child: Container(
         decoration: BoxDecoration(
-          color: Colors.white, borderRadius: BorderRadius.circular(14),
+          color: isDark ? const Color(0xFF1E1E1E) : Colors.white,
+          borderRadius: BorderRadius.circular(14),
           border: isOverdue ? Border.all(color: Colors.red.shade200, width: 1.5) : null,
-          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.04), blurRadius: 8, offset: const Offset(0, 3))],
+          boxShadow: [BoxShadow(color: Colors.black.withValues(alpha: 0.06), blurRadius: 8, offset: const Offset(0, 3))],
         ),
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -622,7 +654,8 @@ class _PlannerPageState extends State<PlannerPage> {
             Row(crossAxisAlignment: CrossAxisAlignment.start, children: [
               Container(margin: const EdgeInsets.only(top: 4, right: 10), width: 8, height: 8,
                 decoration: BoxDecoration(color: _statusColor(task.status), shape: BoxShape.circle)),
-              Expanded(child: Text(task.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.black87,
+              Expanded(child: Text(task.title, style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15,
+                color: isDark ? Colors.white : Colors.black87,
                 decoration: task.status == 'done' ? TextDecoration.lineThrough : null))),
               PopupMenuButton<String>(
                 icon: const Icon(Icons.more_horiz, size: 18, color: Colors.grey),
@@ -644,7 +677,7 @@ class _PlannerPageState extends State<PlannerPage> {
                 ],
               ),
             ]),
-            if (task.description.isNotEmpty) ...[const SizedBox(height: 8), Text(task.description, style: const TextStyle(fontSize: 13, color: Colors.black54, height: 1.4), maxLines: 3, overflow: TextOverflow.ellipsis)],
+            if (task.description.isNotEmpty) ...[const SizedBox(height: 8), Text(task.description, style: TextStyle(fontSize: 13, color: isDark ? Colors.white54 : Colors.black54, height: 1.4), maxLines: 3, overflow: TextOverflow.ellipsis)],
             const SizedBox(height: 12),
             Wrap(spacing: 8, runSpacing: 6, children: [
               if (task.weatherConditionTarget != null)

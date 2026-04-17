@@ -166,7 +166,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
         borderRadius: BorderRadius.circular(16),
         boxShadow: [
           BoxShadow(
-            color: color.withOpacity(0.3),
+            color: color.withAlpha(76), // ~0.3 opacity
             blurRadius: 8,
             offset: const Offset(0, 4),
           ),

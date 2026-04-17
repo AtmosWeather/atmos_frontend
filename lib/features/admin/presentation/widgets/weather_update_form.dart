@@ -1,9 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/services/news_api_service.dart';
 import 'package:image_picker/image_picker.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
-import 'package:atmos_frontend/core/config/api_config.dart';
 
 class WeatherUpdateForm extends StatefulWidget {
   final WeatherUpdate? initialUpdate;
@@ -48,12 +46,14 @@ class _WeatherUpdateFormState extends State<WeatherUpdateForm> {
 
   void _showError(String message) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(message), backgroundColor: Colors.red));
+    ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message), backgroundColor: Colors.red));
   }
 
   Future<void> _pickAndUploadImage() async {
     final ImagePicker picker = ImagePicker();
-    final XFile? image = await picker.pickImage(source: ImageSource.gallery, imageQuality: 30, maxWidth: 800);
+    final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery, imageQuality: 30, maxWidth: 800);
     if (image != null) {
       setState(() => _isLoading = true);
       try {
@@ -135,8 +135,11 @@ class _WeatherUpdateFormState extends State<WeatherUpdateForm> {
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   children: [
                     Text(
-                      widget.initialUpdate == null ? 'New Update' : 'Edit Update',
-                      style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
+                      widget.initialUpdate == null
+                          ? 'New Update'
+                          : 'Edit Update',
+                      style: const TextStyle(
+                          fontSize: 22, fontWeight: FontWeight.bold),
                     ),
                     IconButton(
                       icon: const Icon(Icons.close),
@@ -173,7 +176,9 @@ class _WeatherUpdateFormState extends State<WeatherUpdateForm> {
                   validator: (v) => v!.isEmpty ? 'Required field' : null,
                 ),
                 const SizedBox(height: 16),
-                const Text('Image Attachment', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black54)),
+                const Text('Image Attachment',
+                    style: TextStyle(
+                        fontWeight: FontWeight.bold, color: Colors.black54)),
                 const SizedBox(height: 8),
                 Container(
                   height: 150,
@@ -188,25 +193,32 @@ class _WeatherUpdateFormState extends State<WeatherUpdateForm> {
                           borderRadius: BorderRadius.circular(12),
                           child: _urlController.text.startsWith('data:image')
                               ? Image.memory(
-                                  base64Decode(_urlController.text.split(',').last),
+                                  base64Decode(
+                                      _urlController.text.split(',').last),
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.broken_image,
+                                          size: 50, color: Colors.grey),
                                 )
                               : Image.network(
                                   _urlController.text,
                                   fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) => const Icon(Icons.broken_image, size: 50, color: Colors.grey),
+                                  errorBuilder: (context, error, stackTrace) =>
+                                      const Icon(Icons.broken_image,
+                                          size: 50, color: Colors.grey),
                                 ),
                         )
                       : const Center(
-                          child: Icon(Icons.image, size: 50, color: Colors.grey),
+                          child:
+                              Icon(Icons.image, size: 50, color: Colors.grey),
                         ),
                 ),
                 const SizedBox(height: 12),
                 ElevatedButton.icon(
                   onPressed: _isLoading ? null : _pickAndUploadImage,
                   icon: const Icon(Icons.upload_file),
-                  label: const Text('Pick Image from Device', style: TextStyle(fontWeight: FontWeight.bold)),
+                  label: const Text('Pick Image from Device',
+                      style: TextStyle(fontWeight: FontWeight.bold)),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.white,
                     foregroundColor: const Color(0xFF29B6F6),
@@ -223,8 +235,13 @@ class _WeatherUpdateFormState extends State<WeatherUpdateForm> {
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: _isLoading
-                      ? const SizedBox(height: 20, width: 20, child: CircularProgressIndicator(color: Colors.white))
-                      : const Text('Save Update', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+                      ? const SizedBox(
+                          height: 20,
+                          width: 20,
+                          child: CircularProgressIndicator(color: Colors.white))
+                      : const Text('Save Update',
+                          style: TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.bold)),
                 ),
               ],
             ),

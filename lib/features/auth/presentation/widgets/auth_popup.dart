@@ -74,7 +74,9 @@ class _SignInPopupDialogState extends State<_SignInPopupDialog> {
             Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
           } else {
             final displayName = responseData['displayName'] as String? ?? '';
-            AuthState().signIn(emailInput, displayName: displayName);
+            final localId = responseData['localId'] as String? ?? '';
+            final photoUrl = responseData['photoUrl'] as String? ?? '';
+            AuthState().signIn(emailInput, displayName: displayName, uid: localId, photoUrl: photoUrl);
             Navigator.pop(context, true); // Return success
           }
         } else {

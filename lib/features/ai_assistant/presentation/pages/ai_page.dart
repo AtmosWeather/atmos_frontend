@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:atmos_frontend/core/auth/auth_state.dart';
 import 'package:atmos_frontend/features/ai_assistant/data/ai_api_client.dart';
 
 class ChatMessage {
@@ -153,107 +154,94 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF12121F),
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF1A1A2E),
-        elevation: 0,
-        leading: IconButton(
-          icon: const Icon(Icons.arrow_back_ios_new, color: Colors.white70, size: 20),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Row(
-          children: [
-            Container(
-              width: 36,
-              height: 36,
-              decoration: BoxDecoration(
-                gradient: const LinearGradient(
-                  colors: [Color(0xFF00D2FF), Color(0xFF3A7BD5)],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
+    return ListenableBuilder(
+      listenable: AuthState(),
+      builder: (context, _) {
+        final isDark = AuthState().theme == 'Dark Mode';
+        final bgColor = isDark ? const Color(0xFF12121F) : Colors.white;
+        final appBarColor = isDark ? const Color(0xFF1A1A2E) : const Color(0xFFEEEEEE);
+        final appBarIconColor = isDark ? Colors.white70 : Colors.black54;
+        final titleColor = isDark ? Colors.white : Colors.black87;
+        final subtitleColor = isDark ? const Color(0xFF4ADE80) : Colors.green.shade600;
+
+        return Scaffold(
+          backgroundColor: bgColor,
+          appBar: AppBar(
+            backgroundColor: appBarColor,
+            elevation: 0,
+            leading: IconButton(
+              icon: Icon(Icons.arrow_back_ios_new, color: appBarIconColor, size: 20),
+              onPressed: () => Navigator.pop(context),
             ),
-            const SizedBox(width: 12),
-            const Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+            title: Row(
               children: [
-                Text(
-                  'Atmos AI Assistant',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w600,
-                    fontSize: 16,
+                Container(
+                  width: 36,
+                  height: 36,
+                  decoration: BoxDecoration(
+                    gradient: const LinearGradient(
+                      colors: [Color(0xFF00D2FF), Color(0xFF3A7BD5)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
                   ),
+                  child: const Icon(Icons.auto_awesome, color: Colors.white, size: 20),
                 ),
-                Text(
-                  'Online',
-                  style: TextStyle(
-                    color: Color(0xFF4ADE80),
-                    fontSize: 12,
-                    fontWeight: FontWeight.w400,
-                  ),
+                const SizedBox(width: 12),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('Atmos AI Assistant', style: TextStyle(color: titleColor, fontWeight: FontWeight.w600, fontSize: 16)),
+                    Text('Online', style: TextStyle(color: subtitleColor, fontSize: 12, fontWeight: FontWeight.w400)),
+                  ],
                 ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.delete_outline, color: Colors.white54, size: 22),
-            tooltip: 'Delete Conversation',
-            onPressed: _messages.isEmpty ? null : _showDeleteDialog,
+            actions: [
+              IconButton(
+                icon: Icon(Icons.delete_outline, color: appBarIconColor, size: 22),
+                tooltip: 'Delete Conversation',
+                onPressed: _messages.isEmpty ? null : _showDeleteDialog,
+              ),
+              const SizedBox(width: 4),
+            ],
           ),
-          const SizedBox(width: 4),
-        ],
-      ),
-      body: Column(
-        children: [
-          // Chat Messages
-          Expanded(
-            child: _isLoadingHistory
-                ? const Center(
-                    child: Column(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        CircularProgressIndicator(
-                          color: Color(0xFF3A7BD5),
-                          strokeWidth: 2,
+          body: Column(
+            children: [
+              Expanded(
+                child: _isLoadingHistory
+                    ? Center(
+                        child: Column(
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            const CircularProgressIndicator(color: Color(0xFF3A7BD5), strokeWidth: 2),
+                            const SizedBox(height: 12),
+                            Text('Loading conversation...', style: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 13)),
+                          ],
                         ),
-                        SizedBox(height: 12),
-                        Text(
-                          'Loading conversation...',
-                          style: TextStyle(color: Colors.white38, fontSize: 13),
-                        ),
-                      ],
-                    ),
-                  )
-                : _messages.isEmpty
-                    ? _buildEmptyState()
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                        itemCount: _messages.length + (_isTyping ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index == _messages.length && _isTyping) {
-                            return _buildTypingIndicator();
-                          }
-                          return _buildMessageBubble(_messages[index]);
-                        },
-                      ),
+                      )
+                    : _messages.isEmpty
+                        ? _buildEmptyState(isDark)
+                        : ListView.builder(
+                            controller: _scrollController,
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            itemCount: _messages.length + (_isTyping ? 1 : 0),
+                            itemBuilder: (context, index) {
+                              if (index == _messages.length && _isTyping) return _buildTypingIndicator(isDark);
+                              return _buildMessageBubble(_messages[index], isDark);
+                            },
+                          ),
+              ),
+              _buildInputArea(isDark),
+            ],
           ),
-
-          // Input Area
-          _buildInputArea(),
-        ],
-      ),
+        );
+      },
     );
   }
 
-  Widget _buildEmptyState() {
+  Widget _buildEmptyState(bool isDark) {
     return Center(
       child: Column(
         mainAxisSize: MainAxisSize.min,
@@ -279,33 +267,18 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
             child: const Icon(Icons.auto_awesome, color: Colors.white, size: 36),
           ),
           const SizedBox(height: 20),
-          const Text(
-            'Atmos AI Assistant',
-            style: TextStyle(
-              color: Colors.white,
-              fontSize: 20,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
+          Text('Atmos AI Assistant', style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 20, fontWeight: FontWeight.w600)),
           const SizedBox(height: 8),
-          const Text(
-            'Ask me about weather, activities,\nand travel recommendations!',
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: Colors.white38,
-              fontSize: 14,
-              height: 1.5,
-            ),
-          ),
+          Text('Ask me about weather, activities,\nand travel recommendations!', textAlign: TextAlign.center, style: TextStyle(color: isDark ? Colors.white38 : Colors.black38, fontSize: 14, height: 1.5)),
           const SizedBox(height: 28),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             alignment: WrapAlignment.center,
             children: [
-              _buildSuggestionChip('Weather in Cebu'),
-              _buildSuggestionChip('Activities in Manila'),
-              _buildSuggestionChip('Plan my day'),
+              _buildSuggestionChip('Weather in Cebu', isDark),
+              _buildSuggestionChip('Activities in Manila', isDark),
+              _buildSuggestionChip('Plan my day', isDark),
             ],
           ),
         ],
@@ -313,28 +286,22 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildSuggestionChip(String text) {
+  Widget _buildSuggestionChip(String text, bool isDark) {
     return GestureDetector(
       onTap: () => _handleSubmitted(text),
       child: Container(
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E1E2C),
+          color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF0F0F0),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: const Color(0xFF2D2D44)),
+          border: Border.all(color: isDark ? const Color(0xFF2D2D44) : const Color(0xFFDDDDDD)),
         ),
-        child: Text(
-          text,
-          style: const TextStyle(
-            color: Colors.white70,
-            fontSize: 13,
-          ),
-        ),
+        child: Text(text, style: TextStyle(color: isDark ? Colors.white70 : Colors.black54, fontSize: 13)),
       ),
     );
   }
 
-  Widget _buildTypingIndicator() {
+  Widget _buildTypingIndicator(bool isDark) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 6),
       child: Row(
@@ -343,7 +310,7 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 18, vertical: 14),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E1E2C),
+              color: isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF0F0F0),
               borderRadius: BorderRadius.circular(18),
             ),
             child: Row(
@@ -376,8 +343,10 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildMessageBubble(ChatMessage message) {
+  Widget _buildMessageBubble(ChatMessage message, bool isDark) {
     final isUser = message.isUser;
+    final aiBubbleColor = isDark ? const Color(0xFF1E1E2C) : const Color(0xFFF0F4FF);
+    final aiTextColor = isDark ? Colors.white.withValues(alpha: 0.9) : Colors.black87;
 
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
@@ -387,12 +356,10 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
         children: [
           Flexible(
             child: Container(
-              constraints: BoxConstraints(
-                maxWidth: MediaQuery.of(context).size.width * 0.75,
-              ),
+              constraints: BoxConstraints(maxWidth: MediaQuery.of(context).size.width * 0.75),
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               decoration: BoxDecoration(
-                color: isUser ? const Color(0xFF3A7BD5) : const Color(0xFF1E1E2C),
+                color: isUser ? const Color(0xFF3A7BD5) : aiBubbleColor,
                 borderRadius: BorderRadius.only(
                   topLeft: const Radius.circular(18),
                   topRight: const Radius.circular(18),
@@ -401,21 +368,13 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
                 ),
                 boxShadow: [
                   BoxShadow(
-                    color: (isUser ? const Color(0xFF3A7BD5) : Colors.black)
-                        .withValues(alpha: 0.15),
+                    color: (isUser ? const Color(0xFF3A7BD5) : Colors.black).withValues(alpha: 0.10),
                     blurRadius: 8,
                     offset: const Offset(0, 2),
                   ),
                 ],
               ),
-              child: Text(
-                message.text,
-                style: TextStyle(
-                  color: isUser ? Colors.white : Colors.white.withValues(alpha: 0.9),
-                  fontSize: 14.5,
-                  height: 1.45,
-                ),
-              ),
+              child: Text(message.text, style: TextStyle(color: isUser ? Colors.white : aiTextColor, fontSize: 14.5, height: 1.45)),
             ),
           ),
         ],
@@ -423,18 +382,16 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
     );
   }
 
-  Widget _buildInputArea() {
+  Widget _buildInputArea(bool isDark) {
     return Container(
       padding: EdgeInsets.only(
-        left: 12,
-        right: 12,
-        top: 12,
+        left: 12, right: 12, top: 12,
         bottom: MediaQuery.of(context).padding.bottom + 12,
       ),
-      decoration: const BoxDecoration(
-        color: Color(0xFF1A1A2E),
+      decoration: BoxDecoration(
+        color: isDark ? const Color(0xFF1A1A2E) : const Color(0xFFEEEEEE),
         border: Border(
-          top: BorderSide(color: Color(0xFF2D2D44), width: 0.5),
+          top: BorderSide(color: isDark ? const Color(0xFF2D2D44) : const Color(0xFFDDDDDD), width: 0.5),
         ),
       ),
       child: Row(
@@ -443,20 +400,20 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
             child: Container(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               decoration: BoxDecoration(
-                color: const Color(0xFF12121F),
+                color: isDark ? const Color(0xFF12121F) : Colors.white,
                 borderRadius: BorderRadius.circular(24),
-                border: Border.all(color: const Color(0xFF2D2D44)),
+                border: Border.all(color: isDark ? const Color(0xFF2D2D44) : const Color(0xFFDDDDDD)),
               ),
               child: TextField(
                 controller: _textController,
                 focusNode: _focusNode,
                 onSubmitted: _handleSubmitted,
-                style: const TextStyle(color: Colors.white, fontSize: 14.5),
-                decoration: const InputDecoration(
+                style: TextStyle(color: isDark ? Colors.white : Colors.black87, fontSize: 14.5),
+                decoration: InputDecoration(
                   hintText: 'Ask Atmos AI...',
-                  hintStyle: TextStyle(color: Colors.white30),
+                  hintStyle: TextStyle(color: isDark ? Colors.white30 : Colors.black38),
                   border: InputBorder.none,
-                  contentPadding: EdgeInsets.symmetric(vertical: 12),
+                  contentPadding: const EdgeInsets.symmetric(vertical: 12),
                 ),
               ),
             ),
@@ -468,24 +425,16 @@ class _AiPageState extends State<AiPage> with TickerProviderStateMixin {
               width: 44,
               height: 44,
               decoration: BoxDecoration(
-                gradient: _isTyping
-                    ? null
-                    : const LinearGradient(
-                        colors: [Color(0xFF00D2FF), Color(0xFF3A7BD5)],
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                      ),
-                color: _isTyping ? const Color(0xFF2D2D44) : null,
+                gradient: _isTyping ? null : const LinearGradient(
+                  colors: [Color(0xFF00D2FF), Color(0xFF3A7BD5)],
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                ),
+                color: _isTyping ? (isDark ? const Color(0xFF2D2D44) : Colors.grey.shade300) : null,
                 borderRadius: BorderRadius.circular(14),
               ),
               child: _isTyping
-                  ? const Padding(
-                      padding: EdgeInsets.all(10),
-                      child: CircularProgressIndicator(
-                        color: Color(0xFF3A7BD5),
-                        strokeWidth: 2,
-                      ),
-                    )
+                  ? const Padding(padding: EdgeInsets.all(10), child: CircularProgressIndicator(color: Color(0xFF3A7BD5), strokeWidth: 2))
                   : const Icon(Icons.send_rounded, color: Colors.white, size: 20),
             ),
           ),
