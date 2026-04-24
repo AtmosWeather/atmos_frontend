@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:http/http.dart' as http;
+import 'dart:convert';
+import 'package:atmos_frontend/core/config/api_config.dart';
 import 'package:atmos_frontend/core/auth/auth_state.dart';
 
 class FeedbackPage extends StatefulWidget {
@@ -23,18 +25,32 @@ class _FeedbackPageState extends State<FeedbackPage> {
       final authState = AuthState();
       final submitEmail = authState.userEmail ?? 'guest@example.com';
       final submitName = authState.displayName ?? '';
-      await FirebaseFirestore.instance.collection('contact_messages').add({
+      final submitPhoto = authState.base64ProfileImage;
+
+      final Map<String, dynamic> bodyData = {
         'name': submitName,
         'email': submitEmail,
         'message': message,
-        'timestamp': FieldValue.serverTimestamp(),
-        'status': 'unread',
-      });
+      };
+      
+      if (submitPhoto != null && submitPhoto.isNotEmpty) {
+        bodyData['photoUrl'] = submitPhoto;
+      }
+
+      final res = await http.post(
+        Uri.parse('${ApiConfig.baseUrl}/api/admin/feedback'),
+        headers: {'Content-Type': 'application/json'},
+        body: jsonEncode(bodyData),
+      );
+
+      if (res.statusCode != 200) {
+        throw Exception('Failed to send');
+      }
 
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: const Text('Message sent successfully', style: TextStyle(color: Colors.white)),
+            content: const Text('Feedback sent successfully', style: TextStyle(color: Colors.white)),
             backgroundColor: Colors.green.shade600,
           ),
         );
