@@ -4,11 +4,15 @@ import 'package:atmos_frontend/core/config/api_config.dart';
 import 'package:atmos_frontend/features/weather/domain/weather_models.dart';
 
 class WeatherApiClient {
-  /// Fetch current weather for a city name. Units = metric (Celsius).
-  Future<CurrentWeather> fetchCurrentWeather(String city) async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}/api/weather/current?city=${Uri.encodeComponent(city)}',
-    );
+  /// Fetch current weather for a city name or coordinates. Units = metric (Celsius).
+  Future<CurrentWeather> fetchCurrentWeather({String? city, double? lat, double? lon}) async {
+    final queryParams = <String, String>{};
+    if (city != null && city.isNotEmpty) queryParams['city'] = city;
+    if (lat != null) queryParams['lat'] = lat.toString();
+    if (lon != null) queryParams['lon'] = lon.toString();
+
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/weather/current').replace(queryParameters: queryParams);
+    
     final response = await http.get(url);
     if (response.statusCode == 200) {
       return CurrentWeather.fromJson(json.decode(response.body));
@@ -20,10 +24,14 @@ class WeatherApiClient {
   }
 
   /// Fetch 5-day / 3-hour forecast then aggregate by day.
-  Future<List<ForecastDay>> fetchForecast(String city) async {
-    final url = Uri.parse(
-      '${ApiConfig.baseUrl}/api/weather/forecast?city=${Uri.encodeComponent(city)}',
-    );
+  Future<List<ForecastDay>> fetchForecast({String? city, double? lat, double? lon}) async {
+    final queryParams = <String, String>{};
+    if (city != null && city.isNotEmpty) queryParams['city'] = city;
+    if (lat != null) queryParams['lat'] = lat.toString();
+    if (lon != null) queryParams['lon'] = lon.toString();
+
+    final url = Uri.parse('${ApiConfig.baseUrl}/api/weather/forecast').replace(queryParameters: queryParams);
+
     final response = await http.get(url);
     if (response.statusCode == 200) {
       final data = json.decode(response.body);
