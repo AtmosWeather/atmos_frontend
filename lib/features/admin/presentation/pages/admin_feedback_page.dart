@@ -40,13 +40,13 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
     }
   }
   
-  Future<void> _deleteMessage(String id) async {
+  Future<void> _archiveMessage(String id) async {
     try {
       await http.delete(Uri.parse('${ApiConfig.baseUrl}/api/admin/feedback/$id'));
       _fetchFeedback(); 
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete message')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to archive message')));
       }
     }
   }
@@ -130,11 +130,11 @@ class _AdminFeedbackPageState extends State<AdminFeedbackPage> {
                       background: Container(
                         alignment: Alignment.centerRight,
                         padding: const EdgeInsets.only(right: 20.0),
-                        color: Colors.red,
-                        child: const Icon(Icons.delete, color: Colors.white),
+                        color: Colors.grey,
+                        child: const Icon(Icons.archive, color: Colors.white),
                       ),
                       onDismissed: (direction) {
-                        _deleteMessage(msg['id'].toString());
+                        _archiveMessage(msg['id'].toString());
                       },
                       child: Card(
                         color: isUnread ? const Color(0xFFE1F5FE) : const Color(0xFFF5F5F5),

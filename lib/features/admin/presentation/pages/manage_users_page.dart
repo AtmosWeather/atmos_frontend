@@ -134,20 +134,20 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
     }
   }
 
-  Future<void> _deleteUser(String uid, String email) async {
+  Future<void> _archiveUser(String uid, String email) async {
     if (email == 'admin@gmail.com') {
-      _showError('Cannot delete the master admin account.');
+      _showError('Cannot archive the master admin account.');
       return;
     }
 
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: Text('Are you sure you want to delete the user $email?'),
+        title: const Text('Archive User'),
+        content: const Text('Are you sure you want to archive this user? It will be hidden but preserved in the database.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel', style: TextStyle(color: Colors.grey))),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Archive', style: TextStyle(color: Colors.grey))),
         ],
       ),
     );
@@ -159,7 +159,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
         if (response.statusCode == 200) {
           _fetchUsers();
         } else {
-          _showError('Failed to delete user');
+          _showError('Failed to archive user');
           setState(() => _isLoading = false);
         }
       } catch (e) {
@@ -250,8 +250,8 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
                               onPressed: () => _editUser(uid, displayName),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteUser(uid, email),
+                              icon: const Icon(Icons.archive, color: Colors.grey),
+                              onPressed: () => _archiveUser(uid, email),
                             ),
                           ],
                         ),

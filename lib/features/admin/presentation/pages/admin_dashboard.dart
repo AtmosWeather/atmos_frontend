@@ -52,30 +52,6 @@ class _AdminDashboardState extends State<AdminDashboard> {
     }
   }
 
-  void _showExitDialog(BuildContext context) {
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Exit Confirmation'),
-          content: const Text('Are you sure you want to quit the Admin account?'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.of(context).pop(), // Cancel
-              child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false); 
-              },
-              child: const Text('Log Out', style: TextStyle(color: Colors.red)),
-            ),
-          ],
-        );
-      },
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -107,12 +83,7 @@ class _AdminDashboardState extends State<AdminDashboard> {
             ),
           ],
         ),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.logout, color: Colors.black87),
-            onPressed: () => _showExitDialog(context),
-          ),
-        ],
+
       ),
       body: _isLoading 
         ? const Center(child: CircularProgressIndicator(color: Color(0xFF29B6F6))) 

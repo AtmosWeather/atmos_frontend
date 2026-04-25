@@ -40,17 +40,17 @@ class _AdminFeedbackDetailsPageState extends State<AdminFeedbackDetailsPage> {
     }
   }
 
-  Future<void> _deleteMessage() async {
+  Future<void> _archiveMessage() async {
     try {
       final id = widget.messageData['id'];
       await http.delete(Uri.parse('${ApiConfig.baseUrl}/api/admin/feedback/$id'));
       widget.onRead(); // Notify parent to refresh list
       if (mounted) {
-        Navigator.pop(context, true); // Pop with truthy value to indicate deletion
+        Navigator.pop(context, true); // Pop with truthy value to indicate archival
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to delete message')));
+        ScaffoldMessenger.of(context).showSnackBar(const SnackBar(content: Text('Failed to archive message')));
       }
     }
   }
@@ -83,21 +83,21 @@ class _AdminFeedbackDetailsPageState extends State<AdminFeedbackDetailsPage> {
         ),
         actions: [
           IconButton(
-            icon: const Icon(Icons.delete, color: Colors.redAccent),
+            icon: const Icon(Icons.archive, color: Colors.grey),
             onPressed: () {
               showDialog(
                 context: context,
                 builder: (context) => AlertDialog(
-                  title: const Text('Delete Message'),
-                  content: const Text('Are you sure you want to delete this message?'),
+                  title: const Text('Archive Message'),
+                  content: const Text('Are you sure you want to archive this message? It will be hidden but preserved in the database.'),
                   actions: [
                     TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
                     TextButton(
                       onPressed: () {
                         Navigator.pop(context);
-                        _deleteMessage();
+                        _archiveMessage();
                       },
-                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                      child: const Text('Archive', style: TextStyle(color: Colors.grey)),
                     ),
                   ],
                 ),

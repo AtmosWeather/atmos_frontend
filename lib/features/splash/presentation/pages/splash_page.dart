@@ -14,8 +14,8 @@ class _SplashPageState extends State<SplashPage> {
   void initState() {
     super.initState();
 
-    // Navigate after 3 seconds
-    Timer(const Duration(seconds: 3), () {
+    // Navigate swiftly
+    Timer(const Duration(milliseconds: 400), () {
       Navigator.pushReplacementNamed(context, '/home');
     });
   }

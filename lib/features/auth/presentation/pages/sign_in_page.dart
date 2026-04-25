@@ -60,11 +60,16 @@ class _SignInPageState extends State<SignInPage> {
 
           final isAdmin = emailInput == 'admin@gmail.com';
 
+          final localId = responseData['localId'] as String? ?? '';
+
           if (isAdmin) {
+            AuthState().signIn(
+              emailInput,
+              uid: localId,
+            );
             Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
           } else {
             final displayName = responseData['displayName'] as String? ?? '';
-            final localId = responseData['localId'] as String? ?? '';
             final photoUrl = responseData['photoUrl'] as String? ?? '';
             final notificationSetting = responseData['notification'] as String? ?? '';
             final themeSetting = responseData['theme'] as String? ?? '';
