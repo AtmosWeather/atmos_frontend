@@ -3,6 +3,8 @@ library;
 
 class CurrentWeather {
   final String cityName;
+  final double lat;
+  final double lon;
   final double temp;
   final double feelsLike;
   final double tempMin;
@@ -20,6 +22,8 @@ class CurrentWeather {
 
   CurrentWeather({
     required this.cityName,
+    required this.lat,
+    required this.lon,
     required this.temp,
     required this.feelsLike,
     required this.tempMin,
@@ -41,8 +45,11 @@ class CurrentWeather {
     final main = json['main'];
     final wind = json['wind'];
     final sys = json['sys'];
+    final coord = json['coord'] ?? {};
     return CurrentWeather(
       cityName: json['name'] ?? '',
+      lat: (coord['lat'] as num?)?.toDouble() ?? 0.0,
+      lon: (coord['lon'] as num?)?.toDouble() ?? 0.0,
       temp: (main['temp'] as num).toDouble(),
       feelsLike: (main['feels_like'] as num).toDouble(),
       tempMin: (main['temp_min'] as num).toDouble(),

@@ -7,7 +7,8 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:atmos_frontend/core/services/news_api_service.dart';
 import 'package:atmos_frontend/features/planner/data/planner_repository.dart';
-
+import 'package:flutter_map/flutter_map.dart';
+import 'package:latlong2/latlong.dart';
 class LandingPage extends StatefulWidget {
   const LandingPage({super.key});
 
@@ -40,6 +41,7 @@ class _LandingPageState extends State<LandingPage> {
   bool _showingDetail = false;
   CurrentWeather? _currentWeather;
   List<ForecastDay> _forecast = [];
+  LatLng? _tappedLocation;
 
   // Planner notification state
   int _pendingTaskCount = 0;
@@ -95,8 +97,8 @@ class _LandingPageState extends State<LandingPage> {
       _errorMessage = null;
     });
     try {
-      final weather = await _apiClient.fetchCurrentWeather(city.trim());
-      final forecast = await _apiClient.fetchForecast(city.trim());
+      final weather = await _apiClient.fetchCurrentWeather(city: city.trim());
+      final forecast = await _apiClient.fetchForecast(city: city.trim());
       await _repository.addCity(weather.cityName);
       await _loadHistory();
       if (mounted) {
@@ -127,8 +129,8 @@ class _LandingPageState extends State<LandingPage> {
       _errorMessage = null;
     });
     try {
-      final weather = await _apiClient.fetchCurrentWeather(city);
-      final forecast = await _apiClient.fetchForecast(city);
+      final weather = await _apiClient.fetchCurrentWeather(city: city);
+      final forecast = await _apiClient.fetchForecast(city: city);
       // Move city to top
       await _repository.addCity(weather.cityName);
       await _loadHistory();
@@ -148,6 +150,143 @@ class _LandingPageState extends State<LandingPage> {
         });
       }
     }
+  }
+
+  Future<void> _openLocationWeather(double lat, double lon) async {
+    setState(() {
+      _isLoading = true;
+      _errorMessage = null;
+    });
+    try {
+      final weather = await _apiClient.fetchCurrentWeather(lat: lat, lon: lon);
+      final forecast = await _apiClient.fetchForecast(lat: lat, lon: lon);
+      // Save the geographical city name returned by OWM
+      await _repository.addCity(weather.cityName);
+      await _loadHistory();
+      if (mounted) {
+        setState(() {
+          _currentWeather = weather;
+          _forecast = forecast;
+          _showingDetail = true;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _errorMessage = 'Failed to load weather for that location.';
+        });
+      }
+    }
+  }
+
+  void _onMapTap(LatLng point) {
+    setState(() {
+      _tappedLocation = point;
+    });
+    showDialog(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('View Weather'),
+        content: const Text('Do you want to see the weather for this location?'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx),
+            child: const Text('Cancel', style: TextStyle(color: Colors.grey)),
+          ),
+          TextButton(
+            onPressed: () {
+              Navigator.pop(ctx);
+              _openLocationWeather(point.latitude, point.longitude);
+            },
+            child: const Text('Yes', style: TextStyle(color: Color(0xFF29B6F6))),
+          ),
+        ],
+      ),
+    );
+  }
+
+  void _showFullScreenMap({LatLng? pinnedLocation, bool isInteractive = true}) {
+    // Failsafe strictly ensuring no NaN coordinates are ever passed into the map options
+    final safeLat = pinnedLocation?.latitude.isNaN == true ? 0.0 : (pinnedLocation?.latitude ?? 20.0);
+    final safeLon = pinnedLocation?.longitude.isNaN == true ? 0.0 : (pinnedLocation?.longitude ?? 0.0);
+    final centerPoint = LatLng(safeLat, safeLon);
+
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        return Dialog(
+          insetPadding: const EdgeInsets.all(16),
+          shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+          child: SizedBox(
+            width: MediaQuery.of(context).size.width,
+            height: MediaQuery.of(context).size.height * 0.7,
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(16),
+                  child: FlutterMap(
+                    options: MapOptions(
+                      initialCenter: centerPoint,
+                      initialZoom: pinnedLocation != null ? 10.0 : 2.0,
+                      minZoom: 2.0,
+                      maxZoom: 18.0,
+                      onTap: isInteractive ? (tapPosition, point) {
+                        Navigator.pop(ctx);
+                        _onMapTap(point);
+                      } : null,
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.atmos_frontend',
+                      ),
+                      if (pinnedLocation != null || _tappedLocation != null)
+                        MarkerLayer(
+                          markers: [
+                            Marker(
+                              point: pinnedLocation != null ? centerPoint : _tappedLocation!,
+                              width: 50,
+                              height: 50,
+                              alignment: Alignment.topCenter,
+                              child: const Icon(
+                                Icons.location_on,
+                                color: Colors.red,
+                                size: 50,
+                              ),
+                            ),
+                          ],
+                        ),
+                    ],
+                  ),
+                ),
+                Positioned(
+                  top: 8,
+                  right: 8,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      shape: BoxShape.circle,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.2),
+                          blurRadius: 4,
+                        ),
+                      ],
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.black87),
+                      onPressed: () => Navigator.pop(ctx),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
+    );
   }
 
   Future<void> _deleteCity(String city) async {
@@ -251,10 +390,11 @@ class _LandingPageState extends State<LandingPage> {
             backgroundColor: bgColor,
             resizeToAvoidBottomInset: false,
             appBar: AppBar(
+              automaticallyImplyLeading: false,
               backgroundColor: appBarColor,
-        elevation: 0,
-        centerTitle: false,
-        title: Row(
+              elevation: 0,
+              centerTitle: false,
+              title: Row(
           children: [
             if (_currentIndex == 2)
               Stack(
@@ -419,241 +559,328 @@ class _LandingPageState extends State<LandingPage> {
     return _showingDetail ? _buildWeatherDetail() : _buildSearchHistoryView();
   }
 
+
   // ════════════════════════════════════════════════════════════
   // Search History View
   // ════════════════════════════════════════════════════════════
   Widget _buildSearchHistoryView() {
-    return Column(
-      children: [
-        // Search bar
-        Padding(
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-          child: Row(
-            children: [
-              Expanded(
-                child: Container(
-                  height: 44,
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: const Color(0xFFE0E0E0)),
-                  ),
-                  child: Row(
-                    children: [
-                      const SizedBox(width: 12),
-                      const Icon(Icons.search, color: Colors.grey, size: 22),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: TextField(
-                          controller: _searchController,
-                          onSubmitted: _searchCity,
-                          decoration: const InputDecoration(
-                            hintText: 'Search location...',
-                            hintStyle: TextStyle(
-                              color: Colors.grey,
-                              fontSize: 14,
-                            ),
-                            border: InputBorder.none,
-                            isDense: true,
-                            contentPadding: EdgeInsets.symmetric(vertical: 10),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              SizedBox(
-                height: 44,
-                child: ElevatedButton(
-                  onPressed: () => _searchCity(_searchController.text),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF29B6F6),
-                    foregroundColor: Colors.white,
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    elevation: 0,
-                    padding: const EdgeInsets.symmetric(horizontal: 20),
-                  ),
-                  child: const Text(
-                    'Search',
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-
-        // Loading / Error
-        if (_isLoading)
-          const Padding(
-            padding: EdgeInsets.only(top: 32),
-            child: CircularProgressIndicator(color: Color(0xFF29B6F6)),
-          ),
-        if (_errorMessage != null)
+    return SingleChildScrollView(
+      physics: const BouncingScrollPhysics(),
+      child: Column(
+        children: [
+          // Search bar
           Padding(
             padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
-            child: Container(
-              width: double.infinity,
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.red.shade50,
-                borderRadius: BorderRadius.circular(10),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.error_outline, color: Colors.red.shade400, size: 20),
-                  const SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      _errorMessage!,
+            child: Row(
+              children: [
+                Expanded(
+                  child: Container(
+                    height: 44,
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFF5F5F5),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: const Color(0xFFE0E0E0)),
+                    ),
+                    child: Row(
+                      children: [
+                        const SizedBox(width: 12),
+                        const Icon(Icons.search, color: Colors.grey, size: 22),
+                        const SizedBox(width: 8),
+                        Expanded(
+                          child: TextField(
+                            controller: _searchController,
+                            onSubmitted: _searchCity,
+                            decoration: const InputDecoration(
+                              hintText: 'Search location...',
+                              hintStyle: TextStyle(
+                                color: Colors.grey,
+                                fontSize: 14,
+                              ),
+                              border: InputBorder.none,
+                              isDense: true,
+                              contentPadding: EdgeInsets.symmetric(vertical: 10),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                SizedBox(
+                  height: 44,
+                  child: ElevatedButton(
+                    onPressed: () => _searchCity(_searchController.text),
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF29B6F6),
+                      foregroundColor: Colors.white,
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      elevation: 0,
+                      padding: const EdgeInsets.symmetric(horizontal: 20),
+                    ),
+                    child: const Text(
+                      'Search',
                       style: TextStyle(
-                        color: Colors.red.shade700,
-                        fontSize: 13,
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
                       ),
                     ),
                   ),
-                ],
-              ),
-            ),
-          ),
-
-        const SizedBox(height: 20),
-
-        // History header
-        if (_searchHistory.isNotEmpty)
-          const Padding(
-            padding: EdgeInsets.symmetric(horizontal: 20),
-            child: Align(
-              alignment: Alignment.centerLeft,
-              child: Text(
-                'Saved Locations',
-                style: TextStyle(
-                  fontSize: 17,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.black87,
                 ),
-              ),
+              ],
             ),
           ),
-        if (_searchHistory.isNotEmpty) const SizedBox(height: 8),
 
-        // City list
-        Expanded(
-          child: _searchHistory.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Icon(Icons.cloud_queue, size: 64, color: Colors.grey.shade300),
-                      const SizedBox(height: 12),
-                      Text(
-                        'No locations yet',
+          // Loading / Error
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.only(top: 32),
+              child: CircularProgressIndicator(color: Color(0xFF29B6F6)),
+            ),
+          if (_errorMessage != null)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(20, 16, 20, 0),
+              child: Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.error_outline, color: Colors.red.shade400, size: 20),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        _errorMessage!,
                         style: TextStyle(
-                          color: Colors.grey.shade500,
-                          fontSize: 16,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      Text(
-                        'Search for a city to see the weather',
-                        style: TextStyle(
-                          color: Colors.grey.shade400,
+                          color: Colors.red.shade700,
                           fontSize: 13,
                         ),
                       ),
-                    ],
+                    ),
+                  ],
+                ),
+              ),
+            ),
+
+          const SizedBox(height: 20),
+
+          // Map View (Philippines focused)
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20),
+            child: Container(
+              height: 220,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(16),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withValues(alpha: 0.05),
+                    blurRadius: 8,
+                    offset: const Offset(0, 4),
                   ),
-                )
-              : ListView.separated(
-                  padding: const EdgeInsets.symmetric(horizontal: 20),
-                  itemCount: _searchHistory.length,
-                  separatorBuilder: (_, __) => const SizedBox(height: 8),
-                  itemBuilder: (context, index) {
-                    final city = _searchHistory[index];
-                    return Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        borderRadius: BorderRadius.circular(14),
-                        onTap: () => _openCityWeather(city),
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 16,
-                            vertical: 14,
-                          ),
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFF5F7FA),
-                            borderRadius: BorderRadius.circular(14),
-                            border: Border.all(
-                              color: const Color(0xFFE8ECF0),
-                              width: 1,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              const Icon(
-                                Icons.location_on_outlined,
-                                color: Color(0xFF29B6F6),
-                                size: 22,
-                              ),
-                              const SizedBox(width: 12),
-                              Expanded(
-                                child: Text(
-                                  city,
-                                  style: const TextStyle(
-                                    fontSize: 15,
-                                    fontWeight: FontWeight.w500,
-                                    color: Colors.black87,
-                                  ),
+                ],
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Stack(
+                  children: [
+                    FlutterMap(
+                      options: MapOptions(
+                        initialCenter: const LatLng(20.0, 0.0),
+                        initialZoom: 1.5,
+                        minZoom: 1.5,
+                        maxZoom: 15.0,
+                        onTap: (tapPosition, point) => _onMapTap(point),
+                      ),
+                      children: [
+                        TileLayer(
+                          urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                          userAgentPackageName: 'com.example.atmos_frontend',
+                        ),
+                        if (_tappedLocation != null)
+                          MarkerLayer(
+                            markers: [
+                              Marker(
+                                point: _tappedLocation!,
+                                width: 40,
+                                height: 40,
+                                alignment: Alignment.topCenter,
+                                child: const Icon(
+                                  Icons.location_on,
+                                  color: Colors.red,
+                                  size: 40,
                                 ),
-                              ),
-                              PopupMenuButton<String>(
-                                icon: const Icon(
-                                  Icons.more_vert,
-                                  color: Colors.grey,
-                                  size: 20,
-                                ),
-                                onSelected: (value) {
-                                  if (value == 'delete') {
-                                    _deleteCity(city);
-                                  }
-                                },
-                                itemBuilder: (_) => [
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(
-                                          Icons.delete_outline,
-                                          color: Colors.red,
-                                          size: 20,
-                                        ),
-                                        SizedBox(width: 8),
-                                        Text(
-                                          'Delete',
-                                          style: TextStyle(color: Colors.red),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                ],
                               ),
                             ],
                           ),
+                      ],
+                    ),
+                    Positioned(
+                      top: 8,
+                      right: 8,
+                      child: Container(
+                        decoration: BoxDecoration(
+                          color: Colors.white,
+                          shape: BoxShape.circle,
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.2),
+                              blurRadius: 4,
+                            ),
+                          ],
+                        ),
+                        child: IconButton(
+                          icon: const Icon(Icons.fullscreen, color: Colors.black87),
+                          onPressed: () => _showFullScreenMap(),
+                          tooltip: 'Full Screen',
                         ),
                       ),
-                    );
-                  },
+                    ),
+                  ],
                 ),
-        ),
-      ],
+              ),
+            ),
+          ),
+
+          const SizedBox(height: 20),
+
+          // History header
+          if (_searchHistory.isNotEmpty)
+            const Padding(
+              padding: EdgeInsets.symmetric(horizontal: 20),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  'Saved Locations',
+                  style: TextStyle(
+                    fontSize: 17,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.black87,
+                  ),
+                ),
+              ),
+            ),
+          if (_searchHistory.isNotEmpty) const SizedBox(height: 8),
+
+          // City list
+          if (_searchHistory.isEmpty)
+            Padding(
+              padding: const EdgeInsets.symmetric(vertical: 40),
+              child: Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(Icons.cloud_queue, size: 64, color: Colors.grey.shade300),
+                    const SizedBox(height: 12),
+                    Text(
+                      'No locations yet',
+                      style: TextStyle(
+                        color: Colors.grey.shade500,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Search for a city to see the weather',
+                      style: TextStyle(
+                        color: Colors.grey.shade400,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            )
+          else
+            ListView.separated(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              padding: const EdgeInsets.fromLTRB(20, 0, 20, 40),
+              itemCount: _searchHistory.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (context, index) {
+                final city = _searchHistory[index];
+                return Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(14),
+                    onTap: () => _openCityWeather(city),
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 16,
+                        vertical: 14,
+                      ),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F7FA),
+                        borderRadius: BorderRadius.circular(14),
+                        border: Border.all(
+                          color: const Color(0xFFE8ECF0),
+                          width: 1,
+                        ),
+                      ),
+                      child: Row(
+                        children: [
+                          const Icon(
+                            Icons.location_on_outlined,
+                            color: Color(0xFF29B6F6),
+                            size: 22,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              city,
+                              style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                                color: Colors.black87,
+                              ),
+                            ),
+                          ),
+                          PopupMenuButton<String>(
+                            icon: const Icon(
+                              Icons.more_vert,
+                              color: Colors.grey,
+                              size: 20,
+                            ),
+                            onSelected: (value) {
+                              if (value == 'delete') {
+                                _deleteCity(city);
+                              }
+                            },
+                            itemBuilder: (_) => [
+                              const PopupMenuItem(
+                                value: 'delete',
+                                child: Row(
+                                  children: [
+                                    Icon(
+                                      Icons.delete_outline,
+                                      color: Colors.red,
+                                      size: 20,
+                                    ),
+                                    SizedBox(width: 8),
+                                    Text(
+                                      'Delete',
+                                      style: TextStyle(color: Colors.red),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                );
+              },
+            ),
+        ],
+      ),
     );
   }
 
@@ -809,7 +1036,9 @@ class _LandingPageState extends State<LandingPage> {
                 child: _infoCard(
                   Icons.air,
                   'Wind',
-                  '${weather.windSpeed} m/s',
+                  AuthState().units.startsWith('°F')
+                      ? '${(weather.windSpeed * 2.23694).round()} mph'
+                      : '${(weather.windSpeed * 3.6).round()} kmph',
                 ),
               ),
             ],
@@ -821,7 +1050,9 @@ class _LandingPageState extends State<LandingPage> {
                 child: _infoCard(
                   Icons.compress,
                   'Pressure',
-                  '${weather.pressure} hPa',
+                  AuthState().units.startsWith('°F')
+                      ? '${(weather.pressure * 0.02953).toStringAsFixed(2)} inHg'
+                      : '${weather.pressure} hPa',
                 ),
               ),
               const SizedBox(width: 12),
@@ -829,7 +1060,9 @@ class _LandingPageState extends State<LandingPage> {
                 child: _infoCard(
                   Icons.visibility,
                   'Visibility',
-                  '${(weather.visibility / 1000).toStringAsFixed(1)} km',
+                  AuthState().units.startsWith('°F')
+                      ? '${(weather.visibility / 1609.34).toStringAsFixed(1)} mi'
+                      : '${(weather.visibility / 1000).toStringAsFixed(1)} km',
                 ),
               ),
             ],
@@ -853,6 +1086,92 @@ class _LandingPageState extends State<LandingPage> {
                 ),
               ),
             ],
+          ),
+
+          const SizedBox(height: 24),
+
+          // Location Map
+          const Text(
+            'Location',
+            style: TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Container(
+            height: 160,
+            width: double.infinity,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(16),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withValues(alpha: 0.05),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(16),
+              child: Stack(
+                children: [
+                  FlutterMap(
+                    options: MapOptions(
+                      initialCenter: LatLng(weather.lat, weather.lon),
+                      initialZoom: 11.0,
+                      interactionOptions: const InteractionOptions(flags: InteractiveFlag.none),
+                    ),
+                    children: [
+                      TileLayer(
+                        urlTemplate: 'https://tile.openstreetmap.org/{z}/{x}/{y}.png',
+                        userAgentPackageName: 'com.example.atmos_frontend',
+                      ),
+                      MarkerLayer(
+                        markers: [
+                          Marker(
+                            point: LatLng(weather.lat, weather.lon),
+                            width: 40,
+                            height: 40,
+                            alignment: Alignment.topCenter,
+                            child: const Icon(
+                              Icons.location_on,
+                              color: Colors.red,
+                              size: 40,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                  Positioned(
+                    top: 8,
+                    right: 8,
+                    child: Container(
+                      decoration: BoxDecoration(
+                        color: Colors.white,
+                        shape: BoxShape.circle,
+                        boxShadow: [
+                          BoxShadow(
+                            color: Colors.black.withValues(alpha: 0.2),
+                            blurRadius: 4,
+                          ),
+                        ],
+                      ),
+                      child: IconButton(
+                        icon: const Icon(Icons.fullscreen, color: Colors.black87),
+                        onPressed: () => _showFullScreenMap(
+                          pinnedLocation: LatLng(weather.lat, weather.lon),
+                          isInteractive: false,
+                        ),
+                        tooltip: 'Full Screen',
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
           ),
 
           const SizedBox(height: 24),
