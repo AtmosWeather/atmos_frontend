@@ -9,6 +9,7 @@ import 'package:atmos_frontend/features/admin/presentation/pages/manage_users_pa
 import 'package:atmos_frontend/features/admin/presentation/pages/weather_updates_admin.dart';
 import 'package:atmos_frontend/features/admin/presentation/pages/admin_activities_page.dart';
 import 'package:atmos_frontend/features/admin/presentation/pages/admin_feedback_page.dart';
+import 'package:atmos_frontend/features/admin/presentation/pages/admin_settings_page.dart';
 
 class AdminLandingPage extends StatefulWidget {
   const AdminLandingPage({super.key});
@@ -28,6 +29,7 @@ class _AdminLandingPageState extends State<AdminLandingPage> {
     AdminActivitiesPage(),
     ManageUsersPage(),
     AdminFeedbackPage(),
+    AdminSettingsPage(),
   ];
 
   @override
@@ -118,6 +120,10 @@ class _AdminLandingPageState extends State<AdminLandingPage> {
                     )
                   : const Icon(Icons.mail),
               label: 'Messages',
+            ),
+            const BottomNavigationBarItem(
+              icon: Icon(Icons.settings),
+              label: 'Settings',
             ),
           ],
         ),

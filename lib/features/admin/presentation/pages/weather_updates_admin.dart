@@ -49,15 +49,15 @@ class _WeatherUpdatesAdminPageState extends State<WeatherUpdatesAdminPage> {
     }
   }
 
-  Future<void> _deleteUpdate(String id) async {
+  Future<void> _archiveUpdate(String id) async {
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('Confirm Delete'),
-        content: const Text('Are you sure you want to delete this weather update?'),
+        title: const Text('Archive Update'),
+        content: const Text('Are you sure you want to archive this update? It will be hidden but preserved in the database.'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(context, false), child: const Text('Cancel')),
-          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Delete', style: TextStyle(color: Colors.red))),
+          TextButton(onPressed: () => Navigator.pop(context, true), child: const Text('Archive', style: TextStyle(color: Colors.grey))),
         ],
       ),
     );
@@ -69,7 +69,7 @@ class _WeatherUpdatesAdminPageState extends State<WeatherUpdatesAdminPage> {
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('Delete failed: $e')),
+            SnackBar(content: Text('Archive failed: $e')),
           );
         }
       }
@@ -168,8 +168,8 @@ class _WeatherUpdatesAdminPageState extends State<WeatherUpdatesAdminPage> {
                               onPressed: () => _showForm(item),
                             ),
                             IconButton(
-                              icon: const Icon(Icons.delete, color: Colors.red),
-                              onPressed: () => _deleteUpdate(item.id),
+                              icon: const Icon(Icons.archive, color: Colors.grey),
+                              onPressed: () => _archiveUpdate(item.id),
                             ),
                           ],
                         ),
