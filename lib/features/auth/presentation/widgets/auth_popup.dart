@@ -68,7 +68,7 @@ class _SignInPopupDialogState extends State<_SignInPopupDialog> {
             return;
           }
 
-          final isAdmin = emailInput == 'admin@gmail.com';
+          final isAdmin = emailInput == 'kentjohnllanita8978@gmail.com';
 
           if (isAdmin) {
             Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);

@@ -45,50 +45,15 @@ class _SignInPageState extends State<SignInPage> {
         setState(() => _isLoading = false);
 
         if (response.statusCode == 200) {
-          final responseData = jsonDecode(response.body)['data'] as Map<String, dynamic>? ?? {};
+          final resBody = jsonDecode(response.body);
+          final requiresOtp = resBody['requires_otp'] == true;
+          final responseData = resBody['data'] as Map<String, dynamic>? ?? {};
           final emailInput = _emailController.text.trim();
-          final firebaseEmail = responseData['email'] as String? ?? '';
 
-          // Case-sensitive validation: ensure input matches the registered email case
-          if (firebaseEmail.isNotEmpty && emailInput != firebaseEmail) {
-            setState(() {
-              _isLoading = false;
-              _errorMessage = 'No account found with this email, or the password is incorrect.';
-            });
-            return;
-          }
-
-          final isAdmin = emailInput == 'admin@gmail.com';
-
-          final localId = responseData['localId'] as String? ?? '';
-
-          if (isAdmin) {
-            AuthState().signIn(
-              emailInput,
-              uid: localId,
-            );
-            Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+          if (requiresOtp) {
+            _showOtpDialog(emailInput, responseData);
           } else {
-            final displayName = responseData['displayName'] as String? ?? '';
-            final photoUrl = responseData['photoUrl'] as String? ?? '';
-            final notificationSetting = responseData['notification'] as String? ?? '';
-            final themeSetting = responseData['theme'] as String? ?? '';
-
-            // Update auth state
-            AuthState().signIn(
-              emailInput,
-              displayName: displayName,
-              uid: localId,
-              photoUrl: photoUrl,
-              notification: notificationSetting,
-              theme: themeSetting,
-            );
-
-            if (Navigator.canPop(context)) {
-              Navigator.pop(context);
-            } else {
-              Navigator.pushReplacementNamed(context, '/home');
-            }
+            _completeSignIn(emailInput, responseData);
           }
         } else {
           final raw = jsonDecode(response.body)['detail'] as String? ?? '';
@@ -104,6 +69,208 @@ class _SignInPageState extends State<SignInPage> {
     }
   }
 
+  void _showOtpDialog(String email, Map<String, dynamic> dataMap) {
+    final otpController = TextEditingController();
+    bool isVerifying = false;
+    String? dialogError;
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) {
+        return StatefulBuilder(
+          builder: (context, setStateDialog) {
+            return AlertDialog(
+              backgroundColor: Colors.white,
+              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              title: const Text('Verify Account'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                   Text(
+                     'A 6-digit confirmation code has been sent to $email.',
+                     style: const TextStyle(fontSize: 14, color: Colors.black87),
+                   ),
+                  const SizedBox(height: 16),
+                  if (dialogError != null)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12.0),
+                      child: Row(
+                        children: [
+                          const Icon(Icons.error_outline, color: Color(0xFFC62828), size: 16),
+                          const SizedBox(width: 6),
+                          Expanded(
+                            child: Text(
+                              dialogError!, 
+                              style: const TextStyle(color: Color(0xFFC62828), fontSize: 13)
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  TextField(
+                    controller: otpController,
+                    keyboardType: TextInputType.number,
+                    maxLength: 6,
+                    decoration: InputDecoration(
+                      hintText: 'Enter 6-digit code',
+                      counterText: '',
+                      border: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFFE0E0E0)),
+                      ),
+                      focusedBorder: OutlineInputBorder(
+                        borderRadius: BorderRadius.circular(12),
+                        borderSide: const BorderSide(color: Color(0xFF29B6F6), width: 2),
+                      ),
+                      filled: true,
+                      fillColor: const Color(0xFFFAFAFA),
+                    ),
+                    onChanged: (v) {
+                      if (dialogError != null) setStateDialog(() => dialogError = null);
+                    },
+                  ),
+                  const SizedBox(height: 12),
+                  Align(
+                    alignment: Alignment.centerRight,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(50, 30),
+                        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                      ),
+                      onPressed: isVerifying ? null : () async {
+                        setStateDialog(() {
+                            dialogError = null;
+                        });
+                        try {
+                            final res = await http.post(
+                              Uri.parse('${ApiConfig.baseUrl}/api/auth/resend-otp'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({'email': email}),
+                            );
+                            setStateDialog(() {
+                                if (res.statusCode == 200) {
+                                    dialogError = 'New code sent!';
+                                } else {
+                                    final errorData = jsonDecode(res.body);
+                                    dialogError = errorData['detail'] ?? 'Failed to resend';
+                                }
+                            });
+                        } catch(e) {
+                            setStateDialog(() {
+                                dialogError = 'Connection error on resend.';
+                            });
+                        }
+                      },
+                      child: const Text('Resend Code?', style: TextStyle(color: Color(0xFF29B6F6), fontSize: 13, fontWeight: FontWeight.bold)),
+                    ),
+                  ),
+                ],
+              ),
+              actions: [
+                TextButton(
+                  onPressed: isVerifying ? null : () => Navigator.pop(context),
+                  child: const Text('Cancel', style: TextStyle(color: Colors.black54)),
+                ),
+                ElevatedButton(
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF29B6F6),
+                    foregroundColor: Colors.white,
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                    elevation: 0,
+                  ),
+                  onPressed: isVerifying
+                      ? null
+                      : () async {
+                          if (otpController.text.length != 6) {
+                            setStateDialog(() => dialogError = 'Please enter a 6-digit code.');
+                            return;
+                          }
+                          setStateDialog(() => isVerifying = true);
+                          try {
+                            final res = await http.post(
+                              Uri.parse('${ApiConfig.baseUrl}/api/auth/verify-otp'),
+                              headers: {'Content-Type': 'application/json'},
+                              body: jsonEncode({'email': email, 'code': otpController.text}),
+                            );
+                            
+                            setStateDialog(() => isVerifying = false);
+                            
+                            if (res.statusCode == 200) {
+                              if (!mounted) return;
+                              Navigator.pop(context); // close dialog
+                              _completeSignIn(email, dataMap);
+                            } else {
+                              final errorData = jsonDecode(res.body);
+                              setStateDialog(() => dialogError = errorData['detail'] ?? 'Invalid OTP code.');
+                            }
+                          } catch (e) {
+                            setStateDialog(() {
+                              isVerifying = false;
+                              dialogError = 'Could not verify. Check your connection.';
+                            });
+                          }
+                        },
+                  child: isVerifying
+                      ? const SizedBox(
+                          width: 16, height: 16, 
+                          child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white)
+                        )
+                      : const Text('Verify', style: TextStyle(fontWeight: FontWeight.bold)),
+                ),
+              ],
+            );
+          },
+        );
+      },
+    );
+  }
+
+  void _completeSignIn(String emailInput, Map<String, dynamic> dataMap) {
+    if (!mounted) return;
+    final firebaseEmail = dataMap['email'] as String? ?? '';
+
+    // Case-sensitive validation: ensure input matches the registered email case
+    if (firebaseEmail.isNotEmpty && emailInput != firebaseEmail) {
+      if (!mounted) return;
+      setState(() {
+        _isLoading = false;
+        _errorMessage = 'No account found with this email, or the password is incorrect.';
+      });
+      return;
+    }
+
+    final isAdmin = emailInput == 'kentjohnllanita8978@gmail.com';
+    final localId = dataMap['localId'] as String? ?? '';
+
+    if (isAdmin) {
+      AuthState().signIn(
+        emailInput,
+        uid: localId,
+      );
+      Navigator.pushNamedAndRemoveUntil(context, '/admin', (route) => false);
+    } else {
+      final displayName = dataMap['displayName'] as String? ?? '';
+      final photoUrl = dataMap['photoUrl'] as String? ?? '';
+      final notificationSetting = dataMap['notification'] as String? ?? '';
+      final themeSetting = dataMap['theme'] as String? ?? '';
+
+      // Update auth state
+      AuthState().signIn(
+        emailInput,
+        displayName: displayName,
+        uid: localId,
+        photoUrl: photoUrl,
+        notification: notificationSetting,
+        theme: themeSetting,
+      );
+
+      // Changed this logic to fix the backstack issues if they occur
+      Navigator.pushNamedAndRemoveUntil(context, '/home', (route) => false);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -112,10 +279,10 @@ class _SignInPageState extends State<SignInPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: Navigator.canPop(context) ? IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
-        ),
+        ) : null,
       ),
       body: Center(
         child: SingleChildScrollView(

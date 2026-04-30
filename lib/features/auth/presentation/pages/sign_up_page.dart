@@ -1,4 +1,3 @@
-import 'package:atmos_frontend/core/auth/auth_state.dart';
 import 'package:atmos_frontend/core/auth/auth_error_messages.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -51,18 +50,14 @@ class _SignUpPageState extends State<SignUpPage> {
         setState(() => _isLoading = false);
 
         if (response.statusCode == 200) {
-          // Pre-fill display name so Settings shows it right after sign-in
-          AuthState().signIn(
-            _emailController.text.trim(),
-            displayName: _nameController.text.trim(),
-          );
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(
               content: Text('Account created successfully! Please sign in.'),
               backgroundColor: Color(0xFF29B6F6),
             ),
           );
-          Navigator.pushReplacementNamed(context, '/signin');
+          // Safely set the stack so that signing in afterwards goes to /home without breaking backtracking.
+          Navigator.pushNamedAndRemoveUntil(context, '/signin', (route) => false);
         } else {
           final raw = jsonDecode(response.body)['detail'] as String? ?? '';
           setState(() => _errorMessage = friendlyAuthError(raw));
@@ -85,10 +80,10 @@ class _SignUpPageState extends State<SignUpPage> {
       appBar: AppBar(
         backgroundColor: Colors.transparent,
         elevation: 0,
-        leading: IconButton(
+        leading: Navigator.canPop(context) ? IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.black87),
           onPressed: () => Navigator.pop(context),
-        ),
+        ) : null,
       ),
       body: Center(
         child: SingleChildScrollView(
