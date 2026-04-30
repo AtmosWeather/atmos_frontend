@@ -24,7 +24,7 @@ class _AdminSettingsPageState extends State<AdminSettingsPage> {
   String? _adminUid;
 
   Future<bool> _verifyCurrentPassword() async {
-    final email = AuthState().userEmail ?? 'admin@gmail.com';
+    final email = AuthState().userEmail ?? 'kentjohnllanita8978@gmail.com';
 
     try {
       final response = await http.post(

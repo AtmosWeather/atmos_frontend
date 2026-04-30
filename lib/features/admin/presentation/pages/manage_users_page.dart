@@ -135,7 +135,7 @@ class _ManageUsersPageState extends State<ManageUsersPage> {
   }
 
   Future<void> _archiveUser(String uid, String email) async {
-    if (email == 'admin@gmail.com') {
+    if (email == 'kentjohnllanita8978@gmail.com') {
       _showError('Cannot archive the master admin account.');
       return;
     }
